@@ -1,106 +1,118 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 type Message = {
-  role: "user" | "assistant";
-  content: string;
+    role: "user" | "assistant";
+    content: string;
 };
 
 export const ChatBot = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [input, setInput] = useState("");
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [input, setInput] = useState("");
+    const bottomRef = useRef<HTMLDivElement | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
-  async function sendMessage() {
-    if (!input.trim()) return;
+    async function sendMessage() {
+        if (!input.trim()) return;
 
-    const userMessage: Message = {
-      role: "user",
-      content: input,
-    };
+        const userMessage: Message = {
+            role: "user",
+            content: input,
+        };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
+        setMessages((prev) => [...prev, userMessage]);
+        setInput("");
+        setLoading(true);
 
-    try {
-      const res = await fetch(`/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: userMessage.content }),
-      });
+        try {
+            abortControllerRef.current = new AbortController();
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
+            const res = await fetch(`/api/chat`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ message: userMessage.content }),
+                signal: abortControllerRef.current.signal,
+            });
 
-      let aiText = "";
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+            let aiText = "";
 
-      while (true) {
-        const { value, done } = await reader!.read();
-        if (done) break;
+            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-        const chunk = decoder.decode(value);
-        aiText += chunk;
+            while (true) {
+                const { value, done } = await reader!.read();
+                if (done) break;
 
-        setMessages((prev) => {
-          const updated = [...prev];
+                const chunk = decoder.decode(value);
+                aiText += chunk;
 
-          updated[updated.length - 1] = {
-            role: "assistant",
-            content: aiText,
-          };
-          return updated;
-        });
-      }
-    } catch (error) {
-      console.log("Error occured", error);
-    } finally {
-      setLoading(false);
+                setMessages((prev) => {
+                    const updated = [...prev];
+
+                    updated[updated.length - 1] = {
+                        role: "assistant",
+                        content: aiText,
+                    };
+                    return updated;
+                });
+            }
+        } catch (error: any) {
+            //handle error gracefully  
+            if (error?.name === 'AbortError') return;
+            setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong! Please try again.' }])
+        } finally {
+            setLoading(false);
+        }
     }
-  }
 
-  return (
-    <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
-      <div>
-        {messages.map((message, idx) => (
-          <div
-            key={idx}
-            className={`p-2 rounded ${
-              message.role === "user"
-                ? "bg-blue-100 text-right"
-                : "bg-gray-50 text-left max-w-80"
-            }`}
-          >
-            {message.content}
-          </div>
-        ))}
-        {loading && (
-          <div className="text-sm text-gray-500">AI is thinking...</div>
-        )}
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={input}
-          className="flex-1 border rounded p-2"
-          onChange={(e) => {
-            setInput(e.target.value);
-          }}
-          placeholder="Ask something..."
-        />
-        <button
-          onClick={sendMessage}
-          className="bg-black text-white px-4 rounded"
-          disabled={loading}
-        >
-          Send
-        </button>
-      </div>
-    </div>
-  );
+    function stopGeneration() {
+        abortControllerRef.current?.abort();
+    }
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
+    }, [messages, loading]);
+
+    return (
+        <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">
+            <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
+            <div className="flex-1 overflow-y-auto">
+                {messages.map((message, idx) => (
+                    <div
+                        key={idx}
+                        className={`p-2 rounded ${message.role === "user"
+                            ? "bg-blue-100 text-right"
+                            : "bg-gray-50 text-left max-w-80"
+                            }`}
+                    >
+                        {message.content}
+                    </div>
+                ))}
+
+                <div ref={bottomRef} />
+            </div>
+            <div className="flex gap-2 mt-4">
+                <input
+                    value={input}
+                    className="flex-1 border rounded p-2"
+                    onChange={(e) => {
+                        setInput(e.target.value);
+                    }}
+                    placeholder="Ask something..."
+                />
+                <button
+                    onClick={loading ? stopGeneration : sendMessage}
+                    className={`text-white px-4 rounded ${loading ? "bg-red-500" : "bg-black "}`}
+                >
+                    {loading ? 'Stop Generating' : 'Send'}
+                </button>
+            </div>
+        </div>
+    );
 };
