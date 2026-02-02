@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 type Message = {
   role: "user" | "assistant";
@@ -11,6 +11,7 @@ export const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   async function sendMessage() {
     if (!input.trim()) return;
@@ -64,12 +65,17 @@ export const ChatBot = () => {
     }
   }
 
+  useEffect(()=>{
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth'})
+  },[messages]);
+
   return (
-    <div className="max-w-xl mx-auto p-4">
+    <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">
       <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
-      <div>
+      <div className="flex-1 overflow-y-auto">
         {messages.map((message, idx) => (
           <div
+            ref={bottomRef}
             key={idx}
             className={`p-2 rounded ${
               message.role === "user"
@@ -84,7 +90,7 @@ export const ChatBot = () => {
           <div className="text-sm text-gray-500">AI is thinking...</div>
         )}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 mt-4">
         <input
           value={input}
           className="flex-1 border rounded p-2"
@@ -95,7 +101,7 @@ export const ChatBot = () => {
         />
         <button
           onClick={sendMessage}
-          className="bg-black text-white px-4 rounded"
+          className="bg-black text-white px-4 rounded disabled:opacity-50"
           disabled={loading}
         >
           Send
