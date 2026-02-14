@@ -26,6 +26,8 @@ export const ChatBot = () => {
         setInput("");
         setLoading(true);
 
+        const updatedMessages = [...messages, userMessage];
+
         try {
             abortControllerRef.current = new AbortController();
 
@@ -34,7 +36,7 @@ export const ChatBot = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ message: userMessage.content }),
+                body: JSON.stringify({ messages: updatedMessages }),
                 signal: abortControllerRef.current.signal,
             });
 

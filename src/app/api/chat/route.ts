@@ -1,11 +1,16 @@
 import { openai } from "@/lib/openai";
 
 export async function POST(req: Request) {
-  const { message } = await req.json();
+  const { messages } = await req.json();
+
+  const systemPrompt = {
+    role : 'system',
+    content: 'You are helpful AI assistant. Keep answers concise.',
+  };
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [{ role: "user", content: message }],
+    messages: [systemPrompt, ...messages],
     stream: true,
   });
 
