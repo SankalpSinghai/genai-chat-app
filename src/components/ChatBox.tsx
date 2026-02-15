@@ -11,8 +11,30 @@ export const ChatBot = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
     const [input, setInput] = useState("");
+    const [summary, setSummary] = useState("");
     const bottomRef = useRef<HTMLDivElement | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    async function summarizeMessages(previousSummary: string, oldMessages: Message[]): Promise<string> {
+        try {
+            const res = await fetch('/api/summarize', {
+                method: "POST",
+                headers: {
+                    "Content-Type": 'application/json',
+                },
+                body: JSON.stringify({
+                    previousSummary,
+                    messages: oldMessages,
+                }),
+            });
+
+            const data = await res.json();
+            return data.summary;
+        } catch (error) {
+            console.log('Error occured in summarisation', error);
+            return previousSummary; //fallback to previous summary
+        }
+    }
 
     async function sendMessage() {
         if (!input.trim()) return;
@@ -26,7 +48,38 @@ export const ChatBot = () => {
         setInput("");
         setLoading(true);
 
+        let currentSummary = summary;
+
         const updatedMessages = [...messages, userMessage];
+
+        //Remove empty placeholder messages (assistant empty message)
+        const cleanedMessages = updatedMessages.filter((m) => m.content.trim() !== '');
+
+        let finalMessages = cleanedMessages;
+
+        if (cleanedMessages.length > 20) {
+            let oldMessages = cleanedMessages.slice(0, 10); //summarise first 10
+            let recentMessages = cleanedMessages.slice(10); // keep remaining
+
+            const newSummary = await summarizeMessages(currentSummary, oldMessages);
+
+            currentSummary = newSummary;
+            setSummary(newSummary);
+
+            finalMessages = recentMessages;
+        }
+
+        //keep only recent messages as context
+        const trimmedMessage = finalMessages.slice(-12);
+
+        const payloadMessages = currentSummary
+            ? [
+                {
+                    role: 'system',
+                    content: `Conversation summary so far:\n ${currentSummary}`
+                },
+                ...trimmedMessage,
+            ] : trimmedMessage;
 
         try {
             abortControllerRef.current = new AbortController();
@@ -36,15 +89,16 @@ export const ChatBot = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ messages: updatedMessages }),
+                body: JSON.stringify({ messages: payloadMessages }),
                 signal: abortControllerRef.current.signal,
             });
 
+            //Reads response body steam chunk by chunk. Converts incoming bytes to readable text.
             const reader = res.body?.getReader();
             const decoder = new TextDecoder();
 
+            //Placeholder assistant message
             let aiText = "";
-
             setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
             while (true) {
