@@ -207,7 +207,6 @@ export const ChatBot = () => {
                                 </ReactMarkdown>
                             )
                         }
-                        {message.content}
                     </div>
                 ))}
 
