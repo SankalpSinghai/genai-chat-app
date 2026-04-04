@@ -141,6 +141,20 @@ export const ChatBot = () => {
         bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
     }, [messages, loading]);
 
+    useEffect(()=>{
+        async function loadChat() {
+            const res = await fetch('/api/history');
+            const data = await res.json();
+
+            if(data?.messages) {
+                setMessages(data.messages);
+                setSummary(data.summary || '');
+            }
+        }
+
+        loadChat();
+    }, []);
+
     return (
         <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">
             <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
