@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 type Message = {
     role: "user" | "assistant";
     content: string;
 };
+
+type SyntaxHighlighterStyle = { [key: string]: React.CSSProperties };
 
 export const ChatBot = () => {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -58,8 +64,8 @@ export const ChatBot = () => {
         let finalMessages = cleanedMessages;
 
         if (cleanedMessages.length > 20) {
-            let oldMessages = cleanedMessages.slice(0, 10); //summarise first 10
-            let recentMessages = cleanedMessages.slice(10); // keep remaining
+            const oldMessages = cleanedMessages.slice(0, 10); //summarise first 10
+            const recentMessages = cleanedMessages.slice(10); // keep remaining
 
             const newSummary = await summarizeMessages(currentSummary, oldMessages);
 
@@ -118,9 +124,9 @@ export const ChatBot = () => {
                     return updated;
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             //handle error gracefully  
-            if (error?.name === 'AbortError') return;
+            if (error instanceof Error && error?.name === 'AbortError') return;
             setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong! Please try again.' }])
         } finally {
             setLoading(false);
@@ -147,6 +153,60 @@ export const ChatBot = () => {
                             : "bg-gray-50 text-left max-w-80"
                             }`}
                     >
+                        {message?.role === 'user'
+                            ? (message.content)
+                            :
+                            (
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        code({ className, children, ...props }) {
+                                            const match = /language-(\w+)/.exec(className || "");
+                                            const isBlock = !!match;
+
+                                            return isBlock ? (
+                                                <SyntaxHighlighter
+                                                    style={oneDark as unknown as SyntaxHighlighterStyle}
+                                                    language={match[1]}
+                                                    PreTag="div"
+                                                >
+                                                    {String(children).replace(/\n$/, "")}
+                                                </SyntaxHighlighter>
+                                            ) : (
+                                                <code
+                                                    className="bg-gray-200 px-1 py-0.5 rounded text-sm"
+                                                    {...props}
+                                                >
+                                                    {children}
+                                                </code>
+                                            );
+                                        },
+                                        p({ children }) {
+                                            return <p className="mb-2 last:mb-0">{children}</p>;
+                                        },
+                                        ul({ children }) {
+                                            return <ul className="list-disc pl-5 mb-2">{children}</ul>;
+                                        },
+                                        ol({ children }) {
+                                            return (
+                                                <ol className="list-decimal pl-5 mb-2">{children}</ol>
+                                            );
+                                        },
+                                        h1({ children }) {
+                                            return <h1 className="text-lg font-bold mb-2">{children}</h1>;
+                                        },
+                                        h2({ children }) {
+                                            return <h2 className="text-base font-bold mb-2">{children}</h2>;
+                                        },
+                                        h3({ children }) {
+                                            return <h3 className="font-semibold mb-1">{children}</h3>;
+                                        },
+                                    }}
+                                >
+                                    {message.content}
+                                </ReactMarkdown>
+                            )
+                        }
                         {message.content}
                     </div>
                 ))}
