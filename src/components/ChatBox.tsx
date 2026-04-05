@@ -143,6 +143,18 @@ export const ChatBot = () => {
         abortControllerRef.current?.abort();
     }
 
+    async function handleNewChat() {
+        try {
+            const res = await fetch('/api/chat/new', { method: 'POST' });
+            const data = await res.json();
+            setChatId(data?.chatId);
+            setMessages([]);
+            setSummary('');
+        } catch (error) {
+            console.error('Error occurred in starting new chat', error);
+        }
+    }
+
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
     }, [messages, loading]);
@@ -168,7 +180,16 @@ export const ChatBot = () => {
 
     return (
         <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">
-            <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
+            <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-semibold">Gen AI Chat</h1>
+            <button
+                className="text-sm bg-black text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800"
+                onClick={handleNewChat}
+                disabled={loading}
+            >
+                + New Chat
+            </button>
+            </div>
             <div className="flex-1 overflow-y-auto">
                 {messages.map((message, idx) => (
                     <div
