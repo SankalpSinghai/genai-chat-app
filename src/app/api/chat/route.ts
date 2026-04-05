@@ -3,7 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { Chat } from "@/models/Chat";
 
 export async function POST(req: Request) {
-  const { messages, summary } = await req.json();
+  const { contextMessages, allMessages, summary } = await req.json();
 
   const systemPrompt = {
     role: 'system',
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [systemPrompt, ...messages],
+    messages: [systemPrompt, ...contextMessages],
     stream: true,
   });
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
           {},
           {
             messages: [
-              ...messages,
+              ...allMessages,
               { role: 'assistant', content: fullResponse },
             ],
             summary: summary || '',
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
             sort: { createdAt: -1 },
             new: true,
           }
-        )
+        );
       } catch (error) {
         console.error('Failed to save chat to database:', error instanceof Error ? error.message : error);
       }

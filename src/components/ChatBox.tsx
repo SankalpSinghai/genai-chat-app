@@ -95,7 +95,11 @@ export const ChatBot = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ messages: payloadMessages }),
+                body: JSON.stringify({
+                    contextMessages: payloadMessages, //for open ai
+                    allMessages: updatedMessages,    //for database
+                    summary: currentSummary,
+                }),
                 signal: abortControllerRef.current.signal,
             });
 
@@ -141,12 +145,12 @@ export const ChatBot = () => {
         bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
     }, [messages, loading]);
 
-    useEffect(()=>{
+    useEffect(() => {
         async function loadChat() {
             const res = await fetch('/api/history');
             const data = await res.json();
 
-            if(data?.messages) {
+            if (data?.messages) {
                 setMessages(data.messages);
                 setSummary(data.summary || '');
             }
