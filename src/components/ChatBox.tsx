@@ -18,6 +18,7 @@ export const ChatBot = () => {
     const [loading, setLoading] = useState(false);
     const [input, setInput] = useState("");
     const [summary, setSummary] = useState("");
+    const [chatId, setChatId] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -99,6 +100,7 @@ export const ChatBot = () => {
                     contextMessages: payloadMessages, //for open ai
                     allMessages: updatedMessages,    //for database
                     summary: currentSummary,
+                    chatId,
                 }),
                 signal: abortControllerRef.current.signal,
             });
@@ -146,18 +148,23 @@ export const ChatBot = () => {
     }, [messages, loading]);
 
     useEffect(() => {
-        async function loadChat() {
-            const res = await fetch('/api/history');
-            const data = await res.json();
-
-            if (data?.messages) {
-                setMessages(data.messages);
-                setSummary(data.summary || '');
+        async function initChat() {
+            const historyRes = await fetch('/api/history');
+            const historyData = await historyRes.json();
+            if (historyData?.chatId) {
+                //use existing chatId
+                setChatId(historyData?.chatId);
+                setMessages(historyData?.messages || []);
+                setSummary(historyData?.summary || '');
+            } else {
+                //create new chat
+                const res = await fetch('/api/chat/new', { method: 'POST' });
+                const data = await res.json();
+                setChatId(data?.chatId);
             }
         }
-
-        loadChat();
-    }, []);
+        initChat();
+    }, [])
 
     return (
         <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">

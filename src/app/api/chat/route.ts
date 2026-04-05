@@ -3,7 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { Chat } from "@/models/Chat";
 
 export async function POST(req: Request) {
-  const { contextMessages, allMessages, summary } = await req.json();
+  const { contextMessages, allMessages, summary, chatId } = await req.json();
 
   const systemPrompt = {
     role: 'system',
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       try {
         await connectToDB();
         await Chat.findOneAndUpdate(
-          {},
+          { chatId },
           {
             messages: [
               ...allMessages,
