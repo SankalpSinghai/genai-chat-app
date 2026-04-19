@@ -6,6 +6,7 @@ const MessageSchema = new mongoose.Schema({
 });
 
 const ChatSchema = new mongoose.Schema({
+    'chatId': {type: String, required: true, unique: true},
     'messages': [MessageSchema],
     'summary': {type: String, default: ''}
 },

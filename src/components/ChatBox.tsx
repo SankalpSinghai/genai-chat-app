@@ -11,6 +11,12 @@ type Message = {
     content: string;
 };
 
+type Chat = {
+    chatId: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
 type SyntaxHighlighterStyle = { [key: string]: React.CSSProperties };
 
 export const ChatBot = () => {
@@ -18,6 +24,8 @@ export const ChatBot = () => {
     const [loading, setLoading] = useState(false);
     const [input, setInput] = useState("");
     const [summary, setSummary] = useState("");
+    const [chatId, setChatId] = useState<string | null>(null);
+    const [chats, setChats] = useState<Chat[]>([]);
     const bottomRef = useRef<HTMLDivElement | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -99,6 +107,7 @@ export const ChatBot = () => {
                     contextMessages: payloadMessages, //for open ai
                     allMessages: updatedMessages,    //for database
                     summary: currentSummary,
+                    chatId,
                 }),
                 signal: abortControllerRef.current.signal,
             });
@@ -141,28 +150,133 @@ export const ChatBot = () => {
         abortControllerRef.current?.abort();
     }
 
+    async function handleNewChat() {
+        try {
+            const res = await fetch('/api/chat/new', { method: 'POST' });
+            const data = await res.json();
+            setChatId(data?.chatId);
+            setMessages([]);
+            setSummary('');
+        } catch (error) {
+            console.error('Error occurred in starting new chat', error);
+        }
+    }
+
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
     }, [messages, loading]);
 
     useEffect(() => {
-        async function loadChat() {
-            const res = await fetch('/api/history');
-            const data = await res.json();
+        async function initChat() {
+            try {
+                const historyRes = await fetch('/api/history');
+                if (!historyRes.ok) {
+                    console.error('Failed to fetch history:', historyRes.status);
+                    return;
+                }
+                const historyData = await historyRes.json();
+                if (historyData?.chatId) {
+                    //use existing chatId
+                    setChatId(historyData?.chatId);
+                    setMessages(historyData?.messages || []);
+                    setSummary(historyData?.summary || '');
+                } else {
+                    //create new chat
+                    const res = await fetch('/api/chat/new', { method: 'POST' });
+                    if (!res.ok) {
+                        console.error('Failed to create new chat:', res.status);
+                        return;
+                    }
+                    const data = await res.json();
+                    setChatId(data?.chatId);
+                    
+                    //RELOAD CHAT LIST
+                    const chatsRes = await fetch(`/api/chats`);
+                    if (chatsRes.ok) {
+                        const chatsData = await chatsRes.json();
+                        setChats(chatsData);
+                    }
+                }
+            } catch (error) {
+                console.error('Error initializing chat:', error);
+            }
+        }
+        initChat();
+    }, [])
 
-            if (data?.messages) {
-                setMessages(data.messages);
-                setSummary(data.summary || '');
+    useEffect(() => {
+        async function loadChats() {
+            try {
+                const res = await fetch('/api/chats');
+                if (!res.ok) {
+                    console.error('Failed to fetch chats:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                setChats(data);
+            } catch (error) {
+                console.error('Error loading chats:', error);
             }
         }
 
-        loadChat();
-    }, []);
+        loadChats();
+    }, [])
+
+    async function loadChat(selectedChatId: string) {
+        try {
+            const res = await fetch(`/api/chat/${selectedChatId}`);
+            if (!res.ok) {
+                console.error('Failed to load chat:', res.status);
+                return;
+            }
+            const data = await res.json();
+
+            setMessages(data.messages || []);
+            setSummary(data.summary || '');
+            setChatId(selectedChatId);
+        } catch (error) {
+            console.error('Error loading chat:', error);
+        }
+    }
 
     return (
-        <div className="max-w-xl mx-auto p-4 h-screen flex flex-col ">
-            <h1 className="text-xl mb-4 font-semibold">Gen AI Chat</h1>
-            <div className="flex-1 overflow-y-auto">
+        <div className="flex h-screen">
+            <div className="w-64 border-r p-3 flex flex-col">
+                <button
+                    onClick={handleNewChat}
+                    className="bg-black text-white px-3 py-2 rounded mb-3"
+                >
+                    + New Chat
+                </button>
+
+                <div className="flex-1 overflow-y-auto">
+                    {chats.map((chat) => (
+                        <div
+                            key={chat.chatId}
+                            onClick={() => loadChat(chat.chatId)}
+                            className={`p-2 rounded cursor-pointer mb-2 ${
+                                chat.chatId === chatId
+                                    ? "bg-gray-200"
+                                    : "hover:bg-gray-100"
+                            }`}
+                        >
+                            Chat {chat.chatId.slice(0, 6)}
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="flex-1 flex flex-col p-4">
+                <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-xl font-semibold">Gen AI Chat</h1>
+                    <button
+                        className="text-sm bg-black text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800"
+                        onClick={handleNewChat}
+                        disabled={loading}
+                    >
+                        + New Chat
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
                 {messages.map((message, idx) => (
                     <div
                         key={idx}
@@ -245,6 +359,7 @@ export const ChatBot = () => {
                 >
                     {loading ? 'Stop Generating' : 'Send'}
                 </button>
+            </div>
             </div>
         </div>
     );
